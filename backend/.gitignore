@@ -1,0 +1,8 @@
+# To hide secret variables
+.env
+# To ignore bulky dependency folder
+/node_modules
+# To hide secret variables
+.env
+# To ignore bulky dependency folder
+/node_modules
