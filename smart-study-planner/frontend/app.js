@@ -4,6 +4,7 @@ const taskList = document.getElementById('task-list');
 const scheduleView = document.getElementById('schedule-view');
 
 // URL of our Node.js backend API
+// Ensure your backend server.js is running on Port 5000
 const API_URL = 'http://localhost:5000/api/tasks';
 const SCHEDULE_API_URL = 'http://localhost:5000/api/schedule';
 
@@ -28,11 +29,15 @@ function sendNotification(title, body) {
 async function fetchTasks() {
     try {
         const response = await fetch(API_URL);
+        if (!response.ok) throw new Error('Failed to fetch tasks');
+        
         tasks = await response.json();
         renderTasks();
-        fetchSchedule(); // Also fetch and render the schedule
+        // Always refresh the schedule whenever tasks are fetched
+        await fetchSchedule(); 
     } catch (error) {
         console.error('Error fetching tasks:', error);
+        taskList.innerHTML = `<p style="color: red;">Unable to load tasks. Is the backend running?</p>`;
     }
 }
 
@@ -55,11 +60,12 @@ taskForm.addEventListener('submit', async function(e) {
         });
 
         if (response.ok) {
-            // Instead of just pushing, we re-fetch to get the DB-generated _id
+            // Re-fetch everything to ensure UI matches the database
             await fetchTasks();
             taskForm.reset();
-            fetchSchedule(); // Re-fetch and render schedule after adding a task
             sendNotification("Task Scheduled! 📚", `"${newTask.subject}" has been added to your smart schedule.`);
+        } else {
+            console.error('Server returned an error while saving task');
         }
     } catch (error) {
         console.error('Error adding task:', error);
@@ -74,10 +80,10 @@ window.deleteTask = async function(taskId) {
         });
 
         if (response.ok) {
-            // Filter out the deleted task using its _id
+            // Local update for immediate feedback, then refresh schedule
             tasks = tasks.filter(task => task._id !== taskId);
-            fetchSchedule(); // Re-fetch and render schedule after deleting a task
             renderTasks();
+            await fetchSchedule();
         }
     } catch (error) {
         console.error('Error deleting task:', error);
@@ -88,7 +94,7 @@ window.deleteTask = async function(taskId) {
 function renderTasks() {
     taskList.innerHTML = '';
 
-    if (tasks.length === 0) {
+    if (!Array.isArray(tasks) || tasks.length === 0) {
         taskList.innerHTML = '<p style="color: #777;">No tasks added yet. Start planning!</p>';
         return;
     }
@@ -96,7 +102,6 @@ function renderTasks() {
     tasks.forEach(task => {
         const li = document.createElement('li');
         li.className = 'task-item';
-        // MongoDB uses _id, so we pass task._id to the delete function
         li.setAttribute('data-id', task._id);
 
         const formattedDate = new Date(task.deadline).toLocaleString();
@@ -112,7 +117,6 @@ function renderTasks() {
                 <button onclick="deleteTask('${task._id}')" class="delete-btn">Delete</button>
             </div>
         `;
-
         taskList.appendChild(li);
     });
 }
@@ -121,6 +125,8 @@ function renderTasks() {
 async function fetchSchedule() {
     try {
         const response = await fetch(SCHEDULE_API_URL);
+        if (!response.ok) throw new Error('Failed to fetch schedule');
+        
         schedule = await response.json();
         renderSchedule();
     } catch (error) {
@@ -130,9 +136,9 @@ async function fetchSchedule() {
 
 // Function to render the schedule to the screen
 function renderSchedule() {
-    scheduleView.innerHTML = ''; // Clear current schedule
+    scheduleView.innerHTML = ''; 
 
-    if (schedule.length === 0) {
+    if (!Array.isArray(schedule) || schedule.length === 0) {
         scheduleView.innerHTML = '<p style="color: #777;">No schedule generated yet. Add some tasks!</p>';
         return;
     }
@@ -140,11 +146,13 @@ function renderSchedule() {
     // Group tasks by day for a daily view
     const groupedSchedule = schedule.reduce((acc, block) => {
         const date = new Date(block.scheduledDate);
-        // Format the date to a readable string for grouping
-        const day = date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-        if (!acc[day]) {
-            acc[day] = [];
-        }
+        const day = date.toLocaleDateString('en-US', { 
+            weekday: 'long', 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+        });
+        if (!acc[day]) acc[day] = [];
         acc[day].push(block);
         return acc;
     }, {});
@@ -165,6 +173,26 @@ function renderSchedule() {
     }
 }
 
-// Initial fetch to load tasks from backend when the page loads
+window.deleteTask = async function(taskId) {
+    try {
+        const response = await fetch(`${API_URL}/${taskId}`, {
+            method: 'DELETE'
+        });
+
+        if (response.ok) {
+            // Remove the task from the local array immediately
+            tasks = tasks.filter(task => task._id !== taskId);
+            renderTasks();
+            // Refresh the schedule to reflect the removal
+            await fetchSchedule();
+        }
+    } catch (error) {
+        console.error('Error deleting task:', error);
+    }
+};
+
+// Initial initialization
 requestNotificationPermission();
 fetchTasks();
+fetchSchedule();
+// End of app.js

@@ -1,4 +1,6 @@
-// 1. Import necessary packages
+require('dotenv').config();
+console.log("Database URI is:", process.env.MONGO_URI); // Add this line
+// // 1. Import necessary packages
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
@@ -57,10 +59,14 @@ app.post('/api/tasks', async (req, res) => {
     }
 });
 
-// 3. DELETE: Remove a task by ID
-app.delete('/api/tasks/:id', async (req, res) => {
-    await Task.findByIdAndDelete(req.params.id);
-    res.json({ message: 'Task deleted successfully' });
+// DELETE: Remove a task by ID
+app.get('/api/tasks/:id', async (req, res) => {
+    try {
+        await Task.findByIdAndDelete(req.params.id);
+        res.json({ message: 'Task deleted successfully' });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
 });
 
 // --- Smart Scheduling Algorithm ---
